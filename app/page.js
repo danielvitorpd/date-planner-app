@@ -14,7 +14,7 @@ const photos = {
 };
 const blankMemory = { title: "", date: "", description: "", photo: null };
 const blankPlan = { name: "", date: "", time: "", restaurant: "", vibe: "" };
-const dateLabel = (value) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}`));
+const dateLabel = (value) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T00:00:00`));
 
 export default function Home() {
   const [view, setView] = useState("tracker");
