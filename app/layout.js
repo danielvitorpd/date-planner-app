@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Date Planner",
-  description: "A modern date-night planner with calendar export.",
+  title: "Relationship Tracker",
+  description: "A shared timeline for your relationship memories and future dates.",
 };
 
 export default function RootLayout({ children }) {

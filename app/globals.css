@@ -28,3 +28,25 @@ button,
 input {
   font: inherit;
 }
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #e6d8d2;
+  border-radius: 0.9rem;
+  background: #fffdfa;
+  padding: 0.75rem 0.9rem;
+  color: #342d34;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #b85d67;
+  box-shadow: 0 0 0 3px rgb(184 93 103 / 15%);
+}
+
+textarea { resize: vertical; }

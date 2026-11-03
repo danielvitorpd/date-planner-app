@@ -1,323 +1,101 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const restaurantOptions = [
-  { label: "Sushi", emoji: "🍣", note: "quiet counter seats" },
-  { label: "Pasta", emoji: "🍝", note: "warm trattoria energy" },
-  { label: "Pizza", emoji: "🍕", note: "easy and cozy" },
-  { label: "Steakhouse", emoji: "🥩", note: "classic dinner mood" },
-  { label: "Mexican", emoji: "🌮", note: "colorful and lively" },
-];
-
-const vibeOptions = [
-  { label: "Cinema", emoji: "🎬", note: "low-key after dinner" },
-  { label: "Picnic", emoji: "🧺", note: "sunset blanket plan" },
-  { label: "Museum", emoji: "🖼️", note: "slow wandering" },
-  { label: "Bowling", emoji: "🎳", note: "playful competition" },
-  { label: "Beach", emoji: "🌊", note: "barefoot evening" },
-  { label: "Dance", emoji: "💃", note: "late-night sparkle" },
-];
-
-const inspirationImages = [
-  {
-    src: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80",
-    alt: "Warm restaurant interior with intimate tables",
-    label: "Dinner",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=80",
-    alt: "Friends enjoying an outdoor picnic",
-    label: "Outdoors",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80",
-    alt: "Classic cinema seats and screen lights",
-    label: "After",
-  },
-];
+const restaurants = ["Sushi", "Pasta", "Pizza", "Steakhouse", "Mexican"];
+const vibes = ["Cinema", "Picnic", "Museum", "Bowling", "Beach", "Dance"];
+const photos = {
+  Sushi: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=900&q=80",
+  Pasta: "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=900&q=80",
+  Pizza: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=80",
+  Steakhouse: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80",
+  Mexican: "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=900&q=80",
+};
+const blankMemory = { title: "", date: "", description: "", photo: null };
+const blankPlan = { name: "", date: "", time: "", restaurant: "", vibe: "" };
+const dateLabel = (value) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}`));
 
 export default function Home() {
-  const [formData, setFormData] = useState({
-    user: "Dan",
-    date: "",
-    time: "",
-    restaurant: "",
-    vibe: "",
-  });
-  const [submittedPlan, setSubmittedPlan] = useState(null);
+  const [view, setView] = useState("tracker");
+  const [events, setEvents] = useState([]);
+  const [memory, setMemory] = useState(blankMemory);
+  const [plan, setPlan] = useState(blankPlan);
+  const [calendarLink, setCalendarLink] = useState("");
+  const [status, setStatus] = useState("");
 
-  const selectedRestaurant = restaurantOptions.find(
-    (option) => option.label === formData.restaurant,
-  );
-  const selectedVibe = vibeOptions.find((option) => option.label === formData.vibe);
+  useEffect(() => {
+    let isCurrent = true;
 
-  const calendarLink = useMemo(() => {
-    if (!submittedPlan?.date || !submittedPlan?.time) {
-      return "#";
-    }
+    fetch("/api/events")
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((savedEvents) => {
+        if (isCurrent) setEvents(savedEvents);
+      })
+      .catch(() => {
+        if (isCurrent) setStatus("Connect Neon to save events permanently.");
+      });
 
-    const startDate = new Date(`${submittedPlan.date}T${submittedPlan.time}`);
+    return () => { isCurrent = false; };
+  }, []);
 
-    if (Number.isNaN(startDate.getTime())) {
-      return "#";
-    }
+  const orderedEvents = useMemo(() => [...events].sort((a, b) => new Date(a.date) - new Date(b.date)), [events]);
+  const today = new Date().toISOString().slice(0, 10);
+  const past = orderedEvents.filter((event) => event.date < today);
+  const upcoming = orderedEvents.filter((event) => event.date >= today);
+  const updateMemory = (event) => setMemory({ ...memory, [event.target.name]: event.target.value });
+  const updatePlan = (event) => setPlan({ ...plan, [event.target.name]: event.target.value });
 
-    const endDate = new Date(startDate);
-    endDate.setHours(endDate.getHours() + 3);
-
-    const formatDate = (date) => date.toISOString().replace(/-|:|\.\d+/g, "");
-    const text = encodeURIComponent(`Date with ${submittedPlan.user} ❤️`);
-    const details = encodeURIComponent(
-      `Restaurant: ${submittedPlan.restaurant}\nActivity: ${submittedPlan.vibe}`,
-    );
-
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${details}`;
-  }, [submittedPlan]);
-
-  const handleChange = (event) => {
-    setFormData({
-      ...formData,
-      [event.target.name]: event.target.value,
-    });
-  };
-
-  const handleSubmit = (event) => {
+  async function addMemory(event) {
     event.preventDefault();
-    setSubmittedPlan(formData);
-  };
+    const data = new FormData();
+    data.set("title", memory.title);
+    data.set("date", memory.date);
+    data.set("description", memory.description);
+    if (memory.photo) data.set("photo", memory.photo);
+    await saveEvent(data);
+  }
 
-  return (
-    <main className="min-h-screen bg-[#f8f2ee] text-[#2a211f]">
-      <section className="mx-auto grid min-h-screen w-full max-w-7xl gap-10 px-5 py-6 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
-        <div className="flex flex-col justify-between gap-8 rounded-[2rem] bg-[#2f3d36] p-5 text-white shadow-2xl shadow-[#4b3426]/15 sm:p-7 lg:min-h-[calc(100vh-3rem)]">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#f6c9a3]">
-                Date Planner
-              </p>
-              <h1 className="mt-4 max-w-2xl text-5xl font-black leading-[0.96] sm:text-7xl">
-                Plan a night that feels personal ✨
-              </h1>
-            </div>
-            <div className="hidden rounded-full bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur sm:block">
-              ❤️ Ready in 3 steps
-            </div>
-          </div>
+  async function createPlan(event) {
+    event.preventDefault();
+    const title = `${plan.restaurant} & ${plan.vibe}`;
+    const description = `A date with ${plan.name}: ${plan.restaurant}, followed by ${plan.vibe.toLowerCase()}.`;
+    const data = { title, date: plan.date, description, photoUrl: photos[plan.restaurant] };
+    await saveEvent(data);
+    const start = new Date(`${plan.date}T${plan.time}`);
+    const end = new Date(start); end.setHours(end.getHours() + 3);
+    const formatDate = (date) => date.toISOString().replace(/-|:|\.\d+/g, "");
+    setCalendarLink(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${formatDate(start)}/${formatDate(end)}&details=${encodeURIComponent(description)}`);
+    setPlan(blankPlan);
+  }
 
-          <div className="grid gap-4 sm:grid-cols-[1.15fr_0.85fr]">
-            <div className="relative min-h-80 overflow-hidden rounded-3xl">
-              <Image
-                src={inspirationImages[0].src}
-                alt={inspirationImages[0].alt}
-                fill
-                priority
-                sizes="(min-width: 1024px) 46vw, 90vw"
-                className="object-cover"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent p-5">
-                <p className="text-sm font-semibold text-[#ffd8b6]">Tonight&apos;s mood</p>
-                <p className="text-2xl font-bold">Dinner, laughs, then something sweet</p>
-              </div>
-            </div>
+  async function saveEvent(data) {
+    setStatus("Saving...");
+    try {
+      const response = await fetch("/api/events", { method: "POST", body: data instanceof FormData ? data : JSON.stringify(data), headers: data instanceof FormData ? undefined : { "Content-Type": "application/json" } });
+      const savedEvent = await response.json();
+      if (!response.ok) throw new Error(savedEvent.error);
+      setEvents((current) => [...current, savedEvent]);
+      setMemory(blankMemory);
+      setStatus("Saved to your shared timeline.");
+    } catch (error) {
+      setStatus(error.message || "Could not save this event.");
+    }
+  }
 
-            <div className="grid gap-4">
-              {inspirationImages.slice(1).map((image) => (
-                <div className="relative min-h-36 overflow-hidden rounded-3xl" key={image.src}>
-                  <Image
-                    src={image.src}
-                    alt={image.alt}
-                    fill
-                    sizes="(min-width: 1024px) 20vw, 45vw"
-                    className="object-cover"
-                  />
-                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#2f3d36]">
-                    {image.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 text-sm text-white/80 sm:grid-cols-3">
-            <p>🍽️ Pick the food</p>
-            <p>🎟️ Choose the vibe</p>
-            <p>📅 Save it to calendar</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-center gap-6 py-4 lg:py-8">
-          <div className="rounded-[2rem] bg-white p-5 shadow-xl shadow-[#4b3426]/10 sm:p-7">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d65c4f]">
-                  Build the plan
-                </p>
-                <h2 className="mt-2 text-3xl font-black text-[#2f3d36] sm:text-4xl">
-                  Details first, magic after
-                </h2>
-              </div>
-              <span className="rounded-2xl bg-[#fff1db] px-4 py-3 text-2xl">💌</span>
-            </div>
-
-            <form className="grid gap-5" onSubmit={handleSubmit}>
-              <label className="grid gap-2 text-sm font-bold text-[#4d403b]">
-                Name
-                <input
-                  className="h-12 rounded-2xl border border-[#eadbd2] bg-[#fbf8f5] px-4 text-base font-semibold outline-none transition focus:border-[#d65c4f] focus:bg-white"
-                  type="text"
-                  name="user"
-                  value={formData.user}
-                  onChange={handleChange}
-                  required
-                />
-              </label>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-bold text-[#4d403b]">
-                  Date
-                  <input
-                    className="h-12 rounded-2xl border border-[#eadbd2] bg-[#fbf8f5] px-4 text-base font-semibold outline-none transition focus:border-[#d65c4f] focus:bg-white"
-                    type="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleChange}
-                    required
-                  />
-                </label>
-
-                <label className="grid gap-2 text-sm font-bold text-[#4d403b]">
-                  Time
-                  <input
-                    className="h-12 rounded-2xl border border-[#eadbd2] bg-[#fbf8f5] px-4 text-base font-semibold outline-none transition focus:border-[#d65c4f] focus:bg-white"
-                    type="time"
-                    name="time"
-                    value={formData.time}
-                    onChange={handleChange}
-                    required
-                  />
-                </label>
-              </div>
-
-              <Picker
-                name="restaurant"
-                title="Restaurant type"
-                options={restaurantOptions}
-                value={formData.restaurant}
-                onChange={handleChange}
-              />
-
-              <Picker
-                name="vibe"
-                title="Date vibe"
-                options={vibeOptions}
-                value={formData.vibe}
-                onChange={handleChange}
-              />
-
-              <button
-                className="mt-2 h-14 rounded-2xl bg-[#d65c4f] px-6 text-base font-black text-white shadow-lg shadow-[#d65c4f]/25 transition hover:bg-[#bd473d] focus:outline-none focus:ring-4 focus:ring-[#f5b8a9]"
-                type="submit"
-              >
-                Create plan 💖
-              </button>
-            </form>
-          </div>
-
-          <section className="rounded-[2rem] border border-white/70 bg-white/70 p-5 shadow-lg shadow-[#4b3426]/5 backdrop-blur sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#7e6255]">
-                  Preview
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-[#2f3d36]">
-                  {submittedPlan ? "Planned Date 🎉" : "Your plan will appear here"}
-                </h2>
-              </div>
-              <a
-                className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
-                  submittedPlan
-                    ? "bg-[#2f3d36] text-white hover:bg-[#243029]"
-                    : "pointer-events-none bg-[#e9ded6] text-[#8f7e75]"
-                }`}
-                href={calendarLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-disabled={!submittedPlan}
-              >
-                Save to Calendar 📅
-              </a>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <PlanItem emoji="🗓️" label="When" value={submittedPlan?.date || "Pick a date"} />
-              <PlanItem emoji="⏰" label="Time" value={submittedPlan?.time || "Pick a time"} />
-              <PlanItem
-                emoji={selectedRestaurant?.emoji || "🍽️"}
-                label="Food"
-                value={submittedPlan?.restaurant || formData.restaurant || "Choose food"}
-              />
-              <PlanItem
-                emoji={selectedVibe?.emoji || "🎟️"}
-                label="Vibe"
-                value={submittedPlan?.vibe || formData.vibe || "Choose activity"}
-              />
-            </div>
-          </section>
-        </div>
-      </section>
-    </main>
-  );
+  return <main className="min-h-screen bg-[#fffaf7] text-[#312b32]">
+    <header className="border-b border-[#eadfd9] bg-[#fffaf7]/95 px-5 py-4 backdrop-blur sm:px-8"><div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+      <button className="text-left" type="button" onClick={() => setView("tracker")}><p className="text-xs font-bold uppercase tracking-[0.22em] text-[#b85d67]">Relationship Tracker</p><h1 className="font-serif text-2xl font-bold text-[#342d34]">Our little story</h1></button>
+      <nav className="flex rounded-full bg-[#f4e9e5] p-1" aria-label="Application sections"><Tab active={view === "tracker"} onClick={() => setView("tracker")}>Timeline</Tab><Tab active={view === "planner"} onClick={() => setView("planner")}>Plan a date</Tab></nav>
+    </div></header>
+    {view === "tracker" ? <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_.9fr] lg:items-end"><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-[#b85d67]">A shared calendar of us</p><h2 className="mt-3 max-w-2xl font-serif text-5xl font-bold leading-[.94] text-[#342d34] sm:text-7xl">Every date becomes part of the story.</h2><p className="mt-5 max-w-xl text-lg leading-8 text-[#71636a]">Keep the moments that shaped you close, and make room for every lovely thing ahead.</p></div><div className="rounded-[2rem] bg-[#4d3948] p-6 text-white shadow-xl shadow-[#4d3948]/15"><p className="text-sm font-semibold text-[#f4c8c5]">Your journey</p><p className="mt-2 font-serif text-4xl font-bold">{events.length} chapters</p><p className="mt-3 text-sm leading-6 text-white/75">Past memories and future plans, all in one place.</p><button className="mt-5 rounded-full bg-[#f6d5cc] px-5 py-3 text-sm font-bold text-[#4d3948] transition hover:bg-white" type="button" onClick={() => setView("planner")}>Plan the next one →</button></div></div>
+      <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_.7fr]"><div className="space-y-10"><Timeline title="Already written" subtitle="The days we keep replaying" events={past} empty="Your favorite memories will live here." /><Timeline title="Coming up" subtitle="The next pages to write" events={upcoming} empty="Plan a date to add it to your shared calendar." /></div><form className="h-fit rounded-[2rem] border border-[#eadfd9] bg-white p-6 shadow-lg shadow-[#8f6f6c]/10 sm:p-8" onSubmit={addMemory}><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b85d67]">Add a memory</p><h3 className="mt-2 font-serif text-3xl font-bold">Save a special day</h3><div className="mt-6 grid gap-4"><Field label="Title"><input required name="title" value={memory.title} onChange={updateMemory} placeholder="The day we..." /></Field><Field label="Date"><input required type="date" name="date" value={memory.date} onChange={updateMemory} /></Field><Field label="Photo (optional)"><input type="file" accept="image/*" onChange={(event) => setMemory({ ...memory, photo: event.target.files?.[0] || null })} /></Field><Field label="Description"><textarea required rows="4" name="description" value={memory.description} onChange={updateMemory} placeholder="What made this date special?" /></Field><button className="rounded-full bg-[#b85d67] px-5 py-3 font-bold text-white transition hover:bg-[#9c4855]" type="submit">Add to our story</button>{status && <p className="text-sm font-semibold text-[#71636a]" role="status">{status}</p>}</div></form></div>
+    </section> : <section className="mx-auto grid max-w-5xl gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:py-20"><div className="rounded-[2rem] bg-[#4d3948] p-7 text-white sm:p-10"><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#f4c8c5]">Date planner</p><h2 className="mt-3 font-serif text-5xl font-bold leading-none">Make the next chapter count.</h2><p className="mt-6 leading-7 text-white/75">This is your planning corner. Once you create a date, it appears on your relationship timeline and is ready for your calendar.</p><button className="mt-8 text-sm font-bold text-[#f6d5cc] underline underline-offset-4" type="button" onClick={() => setView("tracker")}>← Back to timeline</button></div><div className="rounded-[2rem] border border-[#eadfd9] bg-white p-6 shadow-xl shadow-[#8f6f6c]/10 sm:p-9"><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b85d67]">A date for two</p><h2 className="mt-2 font-serif text-4xl font-bold">Build the plan</h2><form className="mt-7 grid gap-5" onSubmit={createPlan}><Field label="Your date's name"><input required name="name" value={plan.name} onChange={updatePlan} placeholder="Alex" /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Date"><input required type="date" name="date" value={plan.date} onChange={updatePlan} /></Field><Field label="Time"><input required type="time" name="time" value={plan.time} onChange={updatePlan} /></Field></div><Select label="Restaurant" name="restaurant" value={plan.restaurant} options={restaurants} onChange={updatePlan} /><Select label="After dinner" name="vibe" value={plan.vibe} options={vibes} onChange={updatePlan} /><button className="rounded-full bg-[#b85d67] px-5 py-4 font-bold text-white transition hover:bg-[#9c4855]" type="submit">Create date & add to tracker</button></form>{calendarLink && <a className="mt-5 block rounded-full bg-[#edf2e9] px-5 py-3 text-center text-sm font-bold text-[#40503e] transition hover:bg-[#dfe9d9]" href={calendarLink} target="_blank" rel="noreferrer">Save this date to Google Calendar ↗</a>}</div></section>}
+  </main>;
 }
 
-function Picker({ name, title, options, value, onChange }) {
-  return (
-    <fieldset className="grid gap-3">
-      <legend className="text-sm font-bold text-[#4d403b]">{title}</legend>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {options.map((option) => (
-          <label
-            className={`cursor-pointer rounded-2xl border p-3 transition ${
-              value === option.label
-                ? "border-[#d65c4f] bg-[#fff4ed] shadow-md shadow-[#d65c4f]/10"
-                : "border-[#eadbd2] bg-[#fbf8f5] hover:border-[#d9bdae]"
-            }`}
-            key={option.label}
-          >
-            <input
-              className="sr-only"
-              type="radio"
-              name={name}
-              value={option.label}
-              checked={value === option.label}
-              onChange={onChange}
-              required
-            />
-            <span className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-white text-xl shadow-sm">
-                {option.emoji}
-              </span>
-              <span>
-                <span className="block font-black text-[#2f3d36]">{option.label}</span>
-                <span className="text-xs font-semibold text-[#8a7468]">{option.note}</span>
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-function PlanItem({ emoji, label, value }) {
-  return (
-    <div className="rounded-2xl bg-white p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8a7468]">{label}</p>
-      <p className="mt-2 flex items-center gap-2 text-lg font-black text-[#2f3d36]">
-        <span>{emoji}</span>
-        <span>{value}</span>
-      </p>
-    </div>
-  );
-}
+function Tab({ active, onClick, children }) { return <button className={`rounded-full px-4 py-2 text-sm font-bold transition ${active ? "bg-white text-[#4d3948] shadow-sm" : "text-[#796a70] hover:text-[#4d3948]"}`} type="button" onClick={onClick}>{children}</button>; }
+function Field({ label, children }) { return <label className="grid gap-2 text-sm font-bold text-[#5c5056]"><span>{label}</span>{children}</label>; }
+function Select({ label, name, value, options, onChange }) { return <Field label={label}><select required name={name} value={value} onChange={onChange}><option value="" disabled>Select one</option>{options.map((option) => <option key={option}>{option}</option>)}</select></Field>; }
+function Timeline({ title, subtitle, events, empty }) { return <section><div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b85d67]">{title}</p><h3 className="mt-1 font-serif text-3xl font-bold">{subtitle}</h3></div><span className="rounded-full bg-[#f4e9e5] px-3 py-1 text-sm font-bold text-[#77656b]">{events.length}</span></div>{events.length ? <div className="grid gap-4 sm:grid-cols-2">{events.map((event) => <article className="overflow-hidden rounded-[1.5rem] border border-[#eadfd9] bg-white shadow-sm" key={event.id}>{event.photo ? <div className="relative h-44"><Image src={event.photo} alt="" fill sizes="(min-width: 640px) 30vw, 90vw" className="object-cover" /></div> : <div className="grid h-44 place-items-center bg-[#f4e9e5] text-4xl" aria-hidden="true">♥</div>}<div className="p-5"><p className="text-xs font-bold uppercase tracking-[.14em] text-[#b85d67]">{dateLabel(event.date)}</p><h4 className="mt-2 font-serif text-2xl font-bold">{event.title}</h4><p className="mt-2 text-sm leading-6 text-[#71636a]">{event.description}</p></div></article>)}</div> : <p className="rounded-2xl border border-dashed border-[#d9cbc5] bg-white/70 p-5 text-[#83747a]">{empty}</p>}</section>; }
