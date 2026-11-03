@@ -23,7 +23,7 @@ function isValidEvent({ title, description, date }) {
 
 export async function GET() {
   try {
-    const events = await getSql()`SELECT id, title, description, event_date, photo_url FROM events ORDER BY event_date ASC`;
+    const events = await getSql()`SELECT id, title, description, event_date::text, photo_url FROM events ORDER BY event_date ASC`;
     return Response.json(events.map(eventResponse));
   } catch (error) {
     console.error("Unable to load events", error);
@@ -66,7 +66,7 @@ export async function POST(request) {
     const [event] = await sql`
       INSERT INTO events (id, title, description, event_date, photo_url)
       VALUES (${id}, ${title.trim()}, ${description.trim()}, ${date}, ${photoUrl})
-      RETURNING id, title, description, event_date, photo_url
+      RETURNING id, title, description, event_date::text, photo_url
     `;
     return Response.json(eventResponse(event), { status: 201 });
   } catch (error) {
