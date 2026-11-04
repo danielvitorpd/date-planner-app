@@ -15,6 +15,22 @@ const photos = {
 const blankMemory = { title: "", date: "", description: "", photo: null };
 const blankPlan = { name: "", date: "", time: "", restaurant: "", vibe: "" };
 const dateLabel = (value) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T00:00:00`));
+const relationshipStart = "2026-04-10";
+
+function localDateIso() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function daysSince(startDate, endDate) {
+  const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+  const elapsed = Date.UTC(endYear, endMonth - 1, endDay) - Date.UTC(startYear, startMonth - 1, startDay);
+  return Math.max(1, Math.floor(elapsed / 86400000) + 1);
+}
 
 export default function Home() {
   const [view, setView] = useState("tracker");
@@ -41,7 +57,8 @@ export default function Home() {
   }, []);
 
   const orderedEvents = useMemo(() => [...events].sort((a, b) => new Date(a.date) - new Date(b.date)), [events]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateIso();
+  const daysTogether = daysSince(relationshipStart, today);
   const past = orderedEvents.filter((event) => event.date < today);
   const upcoming = orderedEvents.filter((event) => event.date >= today);
   const updateMemory = (event) => setMemory({ ...memory, [event.target.name]: event.target.value });
@@ -115,7 +132,7 @@ export default function Home() {
       <nav className="flex rounded-full bg-[#f4e9e5] p-1" aria-label="Application sections"><Tab active={view === "tracker"} onClick={() => setView("tracker")}>Timeline</Tab><Tab active={view === "planner"} onClick={() => setView("planner")}>Plan a date</Tab></nav>
     </div></header>
     {view === "tracker" ? <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_.9fr] lg:items-end"><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-[#b85d67]">A shared calendar of us</p><h2 className="mt-3 max-w-2xl font-serif text-5xl font-bold leading-[.94] text-[#342d34] sm:text-7xl">Every date becomes part of the story.</h2><p className="mt-5 max-w-xl text-lg leading-8 text-[#71636a]">Keep the moments that shaped you close, and make room for every lovely thing ahead.</p></div><div className="rounded-[2rem] bg-[#4d3948] p-6 text-white shadow-xl shadow-[#4d3948]/15"><p className="text-sm font-semibold text-[#f4c8c5]">Your journey</p><p className="mt-2 font-serif text-4xl font-bold">{events.length} chapters</p><p className="mt-3 text-sm leading-6 text-white/75">Past memories and future plans, all in one place.</p><button className="mt-5 rounded-full bg-[#f6d5cc] px-5 py-3 text-sm font-bold text-[#4d3948] transition hover:bg-white" type="button" onClick={() => setView("planner")}>Plan the next one →</button></div></div>
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_.9fr] lg:items-end"><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-[#b85d67]">A shared calendar of us</p><h2 className="mt-3 max-w-2xl font-serif text-5xl font-bold leading-[.94] text-[#342d34] sm:text-7xl">Every date becomes part of the story.</h2><p className="mt-5 max-w-xl text-lg leading-8 text-[#71636a]">Keep the moments that shaped you close, and make room for every lovely thing ahead.</p></div><div className="rounded-[2rem] bg-[#4d3948] p-6 text-white shadow-xl shadow-[#4d3948]/15"><p className="text-sm font-semibold text-[#f4c8c5]">Your journey</p><div className="mt-2 flex items-end justify-between gap-4"><div><p className="font-serif text-4xl font-bold">{events.length} chapters</p><p className="mt-2 text-sm text-white/75">Past memories and future plans, all in one place.</p></div><div className="rounded-2xl bg-white/10 px-4 py-3 text-right"><p className="text-xs font-bold uppercase tracking-[.12em] text-[#f4c8c5]">Days together</p><p className="mt-1 font-serif text-3xl font-bold">{daysTogether}</p><p className="text-xs text-white/65">since Apr 10, 2026</p></div></div><button className="mt-5 rounded-full bg-[#f6d5cc] px-5 py-3 text-sm font-bold text-[#4d3948] transition hover:bg-white" type="button" onClick={() => setView("planner")}>Plan the next one →</button></div></div>
       <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_.7fr]"><div className="space-y-10"><Timeline title="Already written" subtitle="The days we keep replaying" events={past} empty="Your favorite memories will live here." onEdit={startEditing} editingEvent={editingEvent} setEditingEvent={setEditingEvent} onSubmit={updateEvent} /><Timeline title="Coming up" subtitle="The next pages to write" events={upcoming} empty="Plan a date to add it to your shared calendar." onEdit={startEditing} editingEvent={editingEvent} setEditingEvent={setEditingEvent} onSubmit={updateEvent} /></div><form className="h-fit rounded-[2rem] border border-[#eadfd9] bg-white p-6 shadow-lg shadow-[#8f6f6c]/10 sm:p-8" onSubmit={addMemory}><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b85d67]">Add a memory</p><h3 className="mt-2 font-serif text-3xl font-bold">Save a special day</h3><div className="mt-6 grid gap-4"><Field label="Title"><input required name="title" value={memory.title} onChange={updateMemory} placeholder="The day we..." /></Field><Field label="Date"><input required type="date" name="date" value={memory.date} onChange={updateMemory} /></Field><Field label="Photo (optional)"><input type="file" accept="image/*" onChange={(event) => setMemory({ ...memory, photo: event.target.files?.[0] || null })} /></Field><Field label="Description"><textarea required rows="4" name="description" value={memory.description} onChange={updateMemory} placeholder="What made this date special?" /></Field><button className="rounded-full bg-[#b85d67] px-5 py-3 font-bold text-white transition hover:bg-[#9c4855]" type="submit">Add to our story</button>{status && <p className="text-sm font-semibold text-[#71636a]" role="status">{status}</p>}</div></form></div>
     </section> : <section className="mx-auto grid max-w-5xl gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:py-20"><div className="rounded-[2rem] bg-[#4d3948] p-7 text-white sm:p-10"><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#f4c8c5]">Date planner</p><h2 className="mt-3 font-serif text-5xl font-bold leading-none">Make the next chapter count.</h2><p className="mt-6 leading-7 text-white/75">This is your planning corner. Once you create a date, it appears on your relationship timeline and is ready for your calendar.</p><button className="mt-8 text-sm font-bold text-[#f6d5cc] underline underline-offset-4" type="button" onClick={() => setView("tracker")}>← Back to timeline</button></div><div className="rounded-[2rem] border border-[#eadfd9] bg-white p-6 shadow-xl shadow-[#8f6f6c]/10 sm:p-9"><p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b85d67]">A date for two</p><h2 className="mt-2 font-serif text-4xl font-bold">Build the plan</h2><form className="mt-7 grid gap-5" onSubmit={createPlan}><Field label="Your date's name"><input required name="name" value={plan.name} onChange={updatePlan} placeholder="Alex" /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Date"><input required type="date" name="date" value={plan.date} onChange={updatePlan} /></Field><Field label="Time"><input required type="time" name="time" value={plan.time} onChange={updatePlan} /></Field></div><Select label="Restaurant" name="restaurant" value={plan.restaurant} options={restaurants} onChange={updatePlan} /><Select label="After dinner" name="vibe" value={plan.vibe} options={vibes} onChange={updatePlan} /><button className="rounded-full bg-[#b85d67] px-5 py-4 font-bold text-white transition hover:bg-[#9c4855]" type="submit">Create date & add to tracker</button></form>{calendarLink && <a className="mt-5 block rounded-full bg-[#edf2e9] px-5 py-3 text-center text-sm font-bold text-[#40503e] transition hover:bg-[#dfe9d9]" href={calendarLink} target="_blank" rel="noreferrer">Save this date to Google Calendar ↗</a>}</div></section>}
   </main>;
